@@ -2,8 +2,11 @@ package com.example.edgedetectionviewer;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.*;
+import android.media.Image;
+import android.media.ImageReader;
 import android.os.Bundle;
 import android.view.Surface;
 import android.view.TextureView;
@@ -12,15 +15,22 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
 public class MainActivity extends AppCompatActivity {
 
     static {
         System.loadLibrary("edgedetectionviewer");
     }
 
+    // JNI method that sends data to C++
+    public native void processFrame(byte[] frameData, int width, int height);
+
     private TextureView textureView;
     private CameraDevice cameraDevice;
     private CameraCaptureSession cameraCaptureSession;
+    private ImageReader imageReader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,8 +70,11 @@ public class MainActivity extends AppCompatActivity {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                     != PackageManager.PERMISSION_GRANTED) {
 
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.CAMERA}, 100);
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{Manifest.permission.CAMERA},
+                        100
+                );
                 return;
             }
 
@@ -91,16 +104,35 @@ public class MainActivity extends AppCompatActivity {
         SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
         surfaceTexture.setDefaultBufferSize(1920, 1080);
 
-        Surface surface = new Surface(surfaceTexture);
+        Surface previewSurface = new Surface(surfaceTexture);
+
+        // ImageReader for getting camera frames (YUV)
+        imageReader = ImageReader.newInstance(
+                1920, 1080,
+                ImageFormat.YUV_420_888,
+                2
+        );
+
+        imageReader.setOnImageAvailableListener(reader -> {
+            Image image = reader.acquireNextImage();
+            if (image != null) {
+                byte[] frameBytes = convertYUVToByteArray(image);
+                processFrame(frameBytes, image.getWidth(), image.getHeight());
+                image.close();
+            }
+        }, null);
+
+        Surface imageSurface = imageReader.getSurface();
 
         try {
             CaptureRequest.Builder builder =
                     cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
 
-            builder.addTarget(surface);
+            builder.addTarget(previewSurface);
+            builder.addTarget(imageSurface);
 
             cameraDevice.createCaptureSession(
-                    java.util.Collections.singletonList(surface),
+                    Arrays.asList(previewSurface, imageSurface),
                     new CameraCaptureSession.StateCallback() {
                         @Override
                         public void onConfigured(@NonNull CameraCaptureSession session) {
@@ -122,5 +154,14 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // Convert camera Image object → byte[]
+    private byte[] convertYUVToByteArray(Image image) {
+        Image.Plane[] planes = image.getPlanes();
+        ByteBuffer buffer = planes[0].getBuffer();
+        byte[] data = new byte[buffer.remaining()];
+        buffer.get(data);
+        return data;
     }
 }
