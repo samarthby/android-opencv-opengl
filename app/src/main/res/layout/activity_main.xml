@@ -9,12 +9,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Processed Edge Output -->
-    <ImageView
-        android:id="@+id/edgeView"
+    <!-- OpenGL output -->
+    <com.example.edgedetectionviewer.gl.MyGLSurfaceView
+        android:id="@+id/glSurfaceView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.7"
-        android:scaleType="centerCrop" />
+        android:alpha="0.9" />
 
 </FrameLayout>

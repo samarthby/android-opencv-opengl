@@ -11,11 +11,14 @@ import android.media.ImageReader;
 import android.os.Bundle;
 import android.view.Surface;
 import android.view.TextureView;
-import android.widget.ImageView;
+import android.opengl.GLSurfaceView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+
+import com.example.edgedetectionviewer.gl.MyGLRenderer;
+import com.example.edgedetectionviewer.gl.MyGLSurfaceView;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -29,8 +32,9 @@ public class MainActivity extends AppCompatActivity {
     // JNI bridge
     public native void processFrame(byte[] frameData, int width, int height);
 
-    private TextureView textureView;
-    private ImageView edgeView;
+    private TextureView textureView;      // Camera feed
+    private MyGLSurfaceView glSurfaceView; // OpenGL view
+    private MyGLRenderer renderer;
 
     private CameraDevice cameraDevice;
     private CameraCaptureSession cameraCaptureSession;
@@ -39,29 +43,33 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_main);
 
-        textureView = findViewById(R.id.textureView);  // camera preview
-        edgeView = findViewById(R.id.edgeView);        // processed edges
+        textureView = findViewById(R.id.textureView);
+        glSurfaceView = findViewById(R.id.glSurfaceView);
+
+        renderer = glSurfaceView.getRenderer();
 
         textureView.setSurfaceTextureListener(surfaceTextureListener);
     }
-    //  CALLBACK FROM C++
+
+    //  CALLBACK FROM C++ (JNI)
     public void onFrameProcessed(byte[] edgeData, int width, int height) {
 
         Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8);
-
         bmp.copyPixelsFromBuffer(ByteBuffer.wrap(edgeData));
 
-        runOnUiThread(() -> edgeView.setImageBitmap(bmp));
+        renderer.updateBitmap(bmp);
+
+        glSurfaceView.requestRender(); // draw new frame
     }
 
     //  CAMERA SETUP
     private final TextureView.SurfaceTextureListener surfaceTextureListener =
             new TextureView.SurfaceTextureListener() {
                 @Override
-                public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface,
-                                                      int width, int height) {
+                public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                     openCamera();
                 }
 
@@ -104,10 +112,8 @@ public class MainActivity extends AppCompatActivity {
             };
 
     private void startCameraPreview() {
-
         SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
         surfaceTexture.setDefaultBufferSize(1920, 1080);
-
         Surface previewSurface = new Surface(surfaceTexture);
 
         imageReader = ImageReader.newInstance(
@@ -159,9 +165,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Correct Y-plane extraction
     private byte[] convertYUVToByteArray(Image image) {
 
         Image.Plane yPlane = image.getPlanes()[0];
+        ByteBuffer yBuffer = yPlane.getBuffer();
 
         int width = image.getWidth();
         int height = image.getHeight();
@@ -169,24 +177,15 @@ public class MainActivity extends AppCompatActivity {
         int rowStride = yPlane.getRowStride();
         int pixelStride = yPlane.getPixelStride();
 
-        ByteBuffer buffer = yPlane.getBuffer();
-        buffer.rewind();   // VERY IMPORTANT
-
         byte[] yBytes = new byte[width * height];
 
         int pos = 0;
 
         for (int row = 0; row < height; row++) {
-
             int rowStart = row * rowStride;
 
             for (int col = 0; col < width; col++) {
-
-                int index = rowStart + col * pixelStride;
-
-                if (index < buffer.limit()) {
-                    yBytes[pos++] = buffer.get(index);
-                }
+                yBytes[pos++] = yBuffer.get(rowStart + col * pixelStride);
             }
         }
 

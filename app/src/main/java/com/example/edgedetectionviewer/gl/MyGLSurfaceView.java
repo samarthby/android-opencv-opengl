@@ -2,22 +2,26 @@ package com.example.edgedetectionviewer.gl;
 
 import android.content.Context;
 import android.opengl.GLSurfaceView;
+import android.util.AttributeSet;
 
 public class MyGLSurfaceView extends GLSurfaceView {
 
     private final MyGLRenderer renderer;
 
-    public MyGLSurfaceView(Context context) {
-        super(context);
+    // Constructor used when inflating from XML
+    public MyGLSurfaceView(Context context, AttributeSet attrs) {
+        super(context, attrs);
 
-        // Use OpenGL ES 2.0
         setEGLContextClientVersion(2);
-
         renderer = new MyGLRenderer();
         setRenderer(renderer);
 
-        // Render on-demand; MainActivity will call requestRender()
+        // We only render when new frame is available
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+    }
+
+    public MyGLSurfaceView(Context context) {
+        this(context, null);
     }
 
     public MyGLRenderer getRenderer() {
