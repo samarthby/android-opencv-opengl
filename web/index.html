@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Viewer</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #121212;
+            color: white;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+
+        h1 {
+            padding: 20px;
+        }
+
+        #container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #uploadedImage, #canvasOutput {
+            border: 1px solid #444;
+            max-width: 90%;
+        }
+
+        #loader {
+            display: none;
+            color: #00eaff;
+        }
+    </style>
+</head>
+<body>
+
+<h1>PNG Viewer</h1>
+
+<div id="container">
+
+    <input id="fileInput" type="file" accept="image/png">
+    <div id="loader">Processing...</div>
+
+    <img id="uploadedImage" style="display:none;" />
+
+    <canvas id="canvasOutput"></canvas>
+
+</div>
+
+<script src="dist/app.js"></script>
+
+
+</body>
+</html>
